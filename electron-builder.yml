@@ -1,0 +1,45 @@
+appId: com.chatxown.app
+productName: ChatXown
+copyright: Copyright © 2026 Vilminessa
+
+directories:
+  output: release
+  buildResources: resources
+
+files:
+  - out/**/*
+  - '!out/youtube.mjs'
+  - '!node_modules/youtubei.js/**'
+  - '!node_modules/@bufbuild/**'
+  - '!node_modules/fflate/**'
+  - '!node_modules/meriyah/**'
+
+extraResources:
+  # Self-contained ESM bundle loaded by src/main/chat/youtube/runtime.ts
+  - from: out/youtube.mjs
+    to: youtube.mjs
+  # Tray / window icons read from process.resourcesPath/resources
+  - from: resources
+    to: resources
+
+win:
+  icon: resources/icon.png
+  target:
+    - target: nsis
+      arch:
+        - x64
+    - target: portable
+      arch:
+        - x64
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: ChatXown
+  artifactName: ${productName}-Setup-${version}.${ext}
+
+portable:
+  artifactName: ${productName}-${version}-portable.${ext}

@@ -4,16 +4,19 @@
   "private": true,
   "description": "Overlay chat for Twitch and YouTube",
   "main": "./out/main/index.js",
-  "author": "",
+  "author": "Vilminessa",
   "license": "MIT",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
+    "bundle:youtube": "node scripts/bundle-youtube.mjs",
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "probe": "node scripts/probe-twitch.mjs",
     "icon": "node scripts/gen-icon.mjs",
-    "test": "node scripts/test.mjs"
+    "test": "node scripts/test.mjs",
+    "dist": "npm run build && npm run bundle:youtube && electron-builder --win",
+    "dist:dir": "npm run build && npm run bundle:youtube && electron-builder --win --dir"
   },
   "dependencies": {
     "ws": "^8.23.0",
@@ -26,6 +29,7 @@
     "@types/ws": "^8.5.13",
     "@vitejs/plugin-react": "^6.3.0",
     "electron": "^45.3.2",
+    "electron-builder": "^26.18.0",
     "electron-vite": "^6.0.0",
     "esbuild": "^0.28.2",
     "react": "^19.3.1",

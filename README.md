@@ -63,6 +63,15 @@ npm test             # юнит-тесты парсера, источников 
 npm run typecheck    # tsc по main и renderer
 ```
 
+Windows-сборка:
+
+```bash
+npm run dist         # NSIS-установщик + portable exe в release/
+npm run dist:dir     # распакованная сборка в release/win-unpacked
+```
+
+Готовые exe публикуются автоматически: создайте и запушьте тег `v0.1.0` — GitHub Actions соберёт установщик и portable-версию и приложит их к релизу.
+
 Полезные переменные окружения:
 
 ```bash
@@ -83,14 +92,16 @@ src/main/twitch/    OAuth (device flow), Helix API, модерация
 src/preload/        contextBridge API
 src/renderer/       overlay (лента) и settings (настройки)
 src/shared/         общие типы и разбор входных ссылок
-scripts/            тесты, генератор иконки, probe IRC/YouTube
+scripts/            тесты, генератор иконки, probe IRC/YouTube, сборка youtubei.js
+.github/workflows/  CI-сборка exe на тегах v*
 ```
 
 ## Технические заметки
 
 - Twitch: `wss://irc-ws.chat.twitch.tv:443`, `CAP REQ :twitch.tv/tags twitch.tv/commands`, анонимный `justinfan*`.
 - Эмоуты: `7tv.io/v3`, `api.betterttv.net/3`, `api.frankerfacez.com/v1`. Приоритет при коллизии имён: 7TV → BTTV → FFZ → нативные.
-- YouTube: `youtubei.js` (ESM, загружается динамическим import), `getLiveStreams()` для поиска эфира, `getInfo().getLiveChat()` для чата; неизвестные узлы парсера игнорируются.
+- YouTube: `youtubei.js` (ESM, загружается динамическим import), `getLiveStreams()` для поиска эфира, `getInfo().getLiveChat()` для чата; неизвестные узлы парсера игнорируются. Для упакованной сборки библиотека собирается esbuild в один `resources/youtube.mjs`, чтобы не зависеть от ESM/asar.
+- Сборка: `electron-builder` (NSIS + portable), иконки из `resources/`, `resources/resources` внутри пакета.
 - Модерация: Helix `DELETE /moderation/chat`, `POST /moderation/bans`, `DELETE /moderation/banned`; авторизация — Device Code Flow без client secret.
 - Окно: `transparent`, `focusable: false`, `setAlwaysOnTop(true, 'screen-saver')`, `setIgnoreMouseEvents(..., { forward: true })`.
 
