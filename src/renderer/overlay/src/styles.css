@@ -176,7 +176,8 @@ body {
   flex: 1 1 auto;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 6px 8px 10px;
+  /* bottom room for the layout toolbar that sits inside the chat area */
+  padding: 6px 8px 46px;
   scrollbar-width: none;
 }
 
@@ -476,6 +477,10 @@ body {
 
 .chat-toolbar {
   position: absolute;
+  left: 16px;
+  bottom: 16px;
+  height: 30px;
+  max-width: calc(100% - 32px);
   display: flex;
   align-items: center;
   gap: 2px;

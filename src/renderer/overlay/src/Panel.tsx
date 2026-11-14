@@ -515,11 +515,21 @@ export function Panel({ config, statuses, auth, patch, onClose, notify }: PanelP
               />
               Показывать оверлей
             </label>
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={config.overlay.pollCursor}
+                onChange={(event) => patch({ overlay: { pollCursor: event.target.checked } })}
+              />
+              Опрос курсора (страховка: наведение определяет main)
+            </label>
           </div>
           <p className="muted small">
             Окно оверлея занимает весь экран основного дисплея, чат — область внутри него. Область
             перетаскивается за шапку, меняется за края и углы, кнопки <kbd>⌜ ⌝ ⌞ ⌟</kbd> прижимают её к
-            углу, <kbd>▣</kbd> растягивает на весь экран. Размер и положение сохраняются.
+            углу, <kbd>▣</kbd> растягивает на весь экран. Тулбар внутри области чата (слева внизу),
+            появляется при наведении: курсор над кнопками остаётся внутри области, поэтому они не
+            пропадают. Размер и положение сохраняются.
           </p>
           <ul className="keys">
             <li>

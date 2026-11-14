@@ -51,8 +51,8 @@ interface ChatAreaProps {
   onDragEnd: () => void
   /** Live rect while dragging. */
   onRect: (rect: ScreenRect) => void
-  /** Pointer released: persist the rect. */
-  onCommit: () => void
+  /** Pointer released: persist the rect, or persist an explicitly requested one. */
+  onCommit: (rect?: ScreenRect) => void
   /** Set the chat area to null (fills the overlay). */
   onFullscreen: () => void
   onOpenPanel: () => void
@@ -143,15 +143,8 @@ export function ChatArea({
     }
   }, [dragMode, view, onRect, onDragEnd, onCommit])
 
-  // The layout toolbar hugs the chat area: below it, above it, or inside when the area is at the top.
-  const TOOLBAR_W = 230
-  const below = rect.y + rect.height + TOOLBAR_H + 8 <= view.height
-  const above = rect.y >= TOOLBAR_H + 40
-  const toolbarY = below ? rect.y + rect.height + 4 : above ? rect.y - TOOLBAR_H - 4 : rect.y + 36
-  const toolbarX = Math.max(
-    4,
-    Math.min(below || above ? rect.x : rect.x + rect.width - TOOLBAR_W, view.width - TOOLBAR_W)
-  )
+  // The layout toolbar lives inside the chat area, clear of the edge and corner handles.
+  const SHOW_SIZE_AT = 260
 
   return (
     <>
@@ -195,6 +188,39 @@ export function ChatArea({
           onModerate={onModerate}
         />
 
+        {interactive && (
+          <div
+            className="chat-toolbar"
+            data-interactive=""
+            onPointerDown={(event) => event.stopPropagation()}
+          >
+            <button title="Чат на весь экран" onClick={onFullscreen}>
+              ▣
+            </button>
+            {ANCHORS.map((anchor) => (
+              <button
+                key={anchor.anchor}
+                title={anchor.title}
+                onClick={() => onCommit(anchorRect(rect, anchor.anchor, view))}
+              >
+                {anchor.glyph}
+              </button>
+            ))}
+            {rect.width >= SHOW_SIZE_AT && (
+              <span className="chat-size">
+                {rect.width}×{rect.height}
+              </span>
+            )}
+            <button
+              className={config.overlay.clickThrough ? '' : 'on'}
+              title="Сквозной режим: клики проходят в приложение под оверлеем (Ctrl+Alt+O)"
+              onClick={() => void api.overlayAction('toggle-click-through')}
+            >
+              ⤢
+            </button>
+          </div>
+        )}
+
         {interactive &&
           HANDLES.map((handle) => (
             <div
@@ -204,41 +230,6 @@ export function ChatArea({
             />
           ))}
       </div>
-
-      {interactive && (
-        <div
-          className="chat-toolbar"
-          data-interactive=""
-          style={{ left: toolbarX, top: toolbarY, height: TOOLBAR_H }}
-          onPointerDown={(event) => event.stopPropagation()}
-        >
-          <button title="Чат на весь экран" onClick={onFullscreen}>
-            ▣
-          </button>
-          {ANCHORS.map((anchor) => (
-            <button
-              key={anchor.anchor}
-              title={anchor.title}
-              onClick={() => {
-                onRect(anchorRect(rect, anchor.anchor, view))
-                onCommit()
-              }}
-            >
-              {anchor.glyph}
-            </button>
-          ))}
-          <span className="chat-size">
-            {rect.width}×{rect.height}
-          </span>
-          <button
-            className={config.overlay.clickThrough ? '' : 'on'}
-            title="Сквозной режим: клики проходят в приложение под оверлеем (Ctrl+Alt+O)"
-            onClick={() => void api.overlayAction('toggle-click-through')}
-          >
-            ⤢
-          </button>
-        </div>
-      )}
     </>
   )
 }

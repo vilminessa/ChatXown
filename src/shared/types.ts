@@ -53,6 +53,11 @@ export interface OverlayConfig {
    * `null` means the chat fills the whole overlay window.
    */
   chat: ScreenRect | null
+  /**
+   * Main process polls the real cursor position and decides the capture itself, as a
+   * fallback when Electron's forwarded mouse events stop reaching the renderer.
+   */
+  pollCursor: boolean
 }
 
 export interface AppConfig {

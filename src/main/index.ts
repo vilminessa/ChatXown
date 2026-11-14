@@ -15,6 +15,7 @@ import {
   bindToDisplay,
   createOverlay,
   getOverlay,
+  interactionSnapshot,
   markQuitting,
   overlayAction,
   setInteractive,
@@ -111,7 +112,11 @@ function start(): void {
       file: probeFile,
       overlay: () => store.get().overlay,
       sources: () => store.get().sources.map((source) => source.channel),
-      statuses: () => manager?.getStatuses() ?? []
+      statuses: () => manager?.getStatuses() ?? [],
+      action: overlayAction,
+      interaction: interactionSnapshot,
+      setChat: (rect) => store.patch({ overlay: { chat: rect } }),
+      setPoll: (enabled) => store.patch({ overlay: { pollCursor: enabled } })
     })
   }
 

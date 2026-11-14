@@ -32,7 +32,7 @@ export function defaultConfig(): AppConfig {
     version: 1,
     sources: [makeSource('twitch', 'vilminessa_', 0)],
     appearance: { ...DEFAULT_APPEARANCE },
-    overlay: { clickThrough: true, visible: true, chat: null },
+    overlay: { clickThrough: true, visible: true, chat: null, pollCursor: true },
     twitch: { clientId: '' }
   }
 }
@@ -140,7 +140,8 @@ export function sanitizeConfig(raw: any): AppConfig {
     overlay: {
       clickThrough: raw.overlay?.clickThrough !== false,
       visible: raw.overlay?.visible !== false,
-      chat: normalizeChat(raw.overlay)
+      chat: normalizeChat(raw.overlay),
+      pollCursor: raw.overlay?.pollCursor !== false
     },
     twitch: { clientId: String(raw.twitch?.clientId ?? '') }
   }
