@@ -33,6 +33,7 @@ export interface ChatXownApi {
   setInteractive(state: InteractiveState): void
   setChat(rect: ScreenRect | null): Promise<AppConfig>
   onPanelToggle(callback: () => void): () => void
+  onCapture(callback: (payload: { clickThrough: boolean }) => void): () => void
   openExternal(url: string): Promise<void>
 
   authStatus(): Promise<AuthStatus>

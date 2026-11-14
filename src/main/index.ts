@@ -69,6 +69,7 @@ function start(): void {
   lastSourcesSignature = JSON.stringify(config.sources)
   manager.setSources(config.sources)
   applyOverlayConfig()
+  let lastClickThrough = config.overlay.clickThrough
 
   store.on('change', (next: AppConfig) => {
     const signature = JSON.stringify(next.sources)
@@ -78,6 +79,10 @@ function start(): void {
     }
     applyOverlayConfig()
     broadcast(IPC.configChanged, next)
+    if (next.overlay.clickThrough !== lastClickThrough) {
+      lastClickThrough = next.overlay.clickThrough
+      broadcast(IPC.overlayCapture, { clickThrough: next.overlay.clickThrough })
+    }
     refreshTray()
   })
 
@@ -111,6 +116,7 @@ function start(): void {
       win: probeWindow,
       file: probeFile,
       overlay: () => store.get().overlay,
+      configVersion: () => store.get().version,
       sources: () => store.get().sources.map((source) => source.channel),
       statuses: () => manager?.getStatuses() ?? [],
       action: overlayAction,

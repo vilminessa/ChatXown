@@ -150,6 +150,12 @@ export function stopCursorPoll(): void {
   }
 }
 
+/** The cursor watcher only runs when the user turned it on in the settings modal. */
+function syncCursorPoll(): void {
+  if (store.get().overlay.pollCursor) startCursorPoll()
+  else stopCursorPoll()
+}
+
 /** Current capture state, for diagnostics and the UI probe. */
 export function interactionSnapshot(): {
   target: InteractiveState
@@ -218,7 +224,7 @@ export function createOverlay(): BrowserWindow {
   overlay.once('ready-to-show', () => {
     if (store.get().overlay.visible) overlay?.showInactive()
     applyInteractive(lastInteractive, { force: true })
-    startCursorPoll()
+    syncCursorPoll()
   })
 
   overlay.on('close', (event) => {
@@ -250,6 +256,7 @@ export function applyOverlayConfig(): void {
   if (!overlay || overlay.isDestroyed()) return
   const config = store.get()
   overlay.setAlwaysOnTop(true, 'screen-saver')
+  syncCursorPoll()
   if (config.overlay.visible) {
     if (!overlay.isVisible()) overlay.showInactive()
   } else if (overlay.isVisible()) {

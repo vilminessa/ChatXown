@@ -163,6 +163,11 @@ export function ChatArea({
                 title={`${status.channel}: ${status.detail ?? status.state}`}
               />
             ))}
+            {!config.overlay.clickThrough && (
+              <span className="capture-chip" title="Ctrl+Alt+O включает сквозной режим: клики снова проходят под оверлей">
+                захват всего экрана
+              </span>
+            )}
             {auth?.loggedIn && (
               <span className="auth-chip" title={`Twitch: ${auth.login ?? ''}`}>
                 @{auth.login}

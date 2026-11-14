@@ -7,6 +7,8 @@ export interface ProbeDeps {
   /** Where the screenshots are written. */
   file: string
   overlay: () => OverlayConfig
+  /** Config schema version: 2 means click-through migration has been applied. */
+  configVersion: () => number
   sources: () => string[]
   statuses: () => SourceStatus[]
   /** Drive hide / show / click-through exactly like the tray and hotkeys do. */
@@ -47,6 +49,15 @@ export function runUiProbe(deps: ProbeDeps): void {
     } catch {
       /* best effort */
     }
+  }
+  /** The probe rewrites the layout while running; put the user's config back afterwards. */
+  const initial = deps.overlay()
+  const initialChat = initial.chat
+  const initialPoll = initial.pollCursor
+
+  const restore = (): void => {
+    deps.setChat(initialChat)
+    deps.setPoll(initialPoll)
   }
 
   void (async () => {
@@ -173,6 +184,10 @@ export function runUiProbe(deps: ProbeDeps): void {
 
     await wait(2500)
     let state = await ready()
+    log(
+      `[probe] config v${deps.configVersion()} overlay=${JSON.stringify(deps.overlay())} ` +
+        `polling=${deps.interaction().polling}`
+    )
     // Deterministic starting layout: a chat area with real space around it.
     deps.setChat({ x: 640, y: 280, width: 720, height: 620 })
     await wait(500)
@@ -191,6 +206,24 @@ export function runUiProbe(deps: ProbeDeps): void {
     state = await uiState()
     log(`[probe] outside chat (${ox},${oy}) -> cls=${state.cls} toolbar=${state.toolbarShown}`)
     logInteraction('outside chat')
+
+    // Capture-all mode: the overlay holds the whole screen, and says so in the head + a toast.
+    deps.action('toggle-click-through')
+    await wait(700)
+    logInteraction('click-through off')
+    log(
+      `[probe] click-through off -> config=${JSON.stringify(deps.overlay())} ` +
+        `chip=${Boolean(await js('Boolean(document.querySelector(".capture-chip"))'))} ` +
+        `toast=${Boolean(await js('Boolean(document.querySelector(".toast"))'))}`
+    )
+    await shoot(deps.file.replace(/\.png$/, '-capture.png'))
+    deps.action('toggle-click-through')
+    await wait(700)
+    logInteraction('click-through on')
+    log(
+      `[probe] click-through on -> config=${JSON.stringify(deps.overlay())} ` +
+        `chip=${Boolean(await js('Boolean(document.querySelector(".capture-chip"))'))}`
+    )
 
     // drag the chat area by its head, then release
     const gx = state.head.x + state.head.width / 2
@@ -317,8 +350,12 @@ export function runUiProbe(deps: ProbeDeps): void {
       await wait(400)
       logInteraction(`watcher tick ${i + 1}`)
     }
+
+    restore()
+    await wait(400)
+    log(`[probe] config restored -> ${JSON.stringify(deps.overlay())}`)
   })().catch((error) => {
-    deps.setPoll(true)
+    restore()
     log(`[probe] failed ${String(error)}`)
     console.error('[probe] failed', error)
   })

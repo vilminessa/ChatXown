@@ -556,6 +556,19 @@ body {
   max-width: 110px;
 }
 
+/* Visible warning that the overlay is holding the whole screen (click-through off). */
+.capture-chip {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(255, 91, 91, 0.22);
+  color: #ffb6b6;
+  border: 1px solid rgba(255, 91, 91, 0.35);
+  white-space: nowrap;
+}
+
 /* -------------------------------- modal -------------------------------- */
 
 .modal-backdrop {

@@ -144,6 +144,14 @@ export function App(): React.JSX.Element {
     })
     const offAuth = api.onAuthChanged((next) => setAuth(next))
     const offPanel = api.onPanelToggle(() => setPanelOpen((open) => !open))
+    const offCapture = api.onCapture(({ clickThrough }) => {
+      notify(
+        clickThrough
+          ? 'Сквозной режим включён — клики проходят под оверлей'
+          : 'Сквозной режим выключен — оверлей держит весь экран',
+        clickThrough ? 'ok' : 'error'
+      )
+    })
 
     return () => {
       offEvent()
@@ -152,6 +160,7 @@ export function App(): React.JSX.Element {
       offConfig()
       offAuth()
       offPanel()
+      offCapture()
     }
   }, [])
 

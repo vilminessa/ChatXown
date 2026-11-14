@@ -10,6 +10,8 @@ export const IPC = {
   overlayInteractive: 'overlay:interactive',
   /** renderer persists the chat area rect (null = full screen) */
   chatSet: 'overlay:chat',
+  /** main tells the overlay that click-through was toggled (toast text) */
+  overlayCapture: 'overlay:capture',
   /** main asks the overlay to open/close the settings modal */
   panelToggle: 'overlay:panel',
   openExternal: 'app:open-external',

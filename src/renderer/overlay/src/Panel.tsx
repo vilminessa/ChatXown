@@ -521,7 +521,7 @@ export function Panel({ config, statuses, auth, patch, onClose, notify }: PanelP
                 checked={config.overlay.pollCursor}
                 onChange={(event) => patch({ overlay: { pollCursor: event.target.checked } })}
               />
-              Опрос курсора (страховка: наведение определяет main)
+              Опрос курсора (страховка, по умолчанию выключен)
             </label>
           </div>
           <p className="muted small">

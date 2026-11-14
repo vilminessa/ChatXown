@@ -1,6 +1,6 @@
 {
   "name": "chatxown",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "description": "Overlay chat for Twitch and YouTube",
   "main": "./out/main/index.js",

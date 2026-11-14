@@ -29,10 +29,10 @@ export const DEFAULT_APPEARANCE: AppearanceConfig = {
 
 export function defaultConfig(): AppConfig {
   return {
-    version: 1,
+    version: 2,
     sources: [makeSource('twitch', 'vilminessa_', 0)],
     appearance: { ...DEFAULT_APPEARANCE },
-    overlay: { clickThrough: true, visible: true, chat: null, pollCursor: true },
+    overlay: { clickThrough: true, visible: true, chat: null, pollCursor: false },
     twitch: { clientId: '' }
   }
 }
@@ -133,15 +133,21 @@ export function sanitizeConfig(raw: any): AppConfig {
     }
   }
 
+  /**
+   * v0.2.2: click-through is on by default. Configs written before v2 captured the whole
+   * screen (the overlay looked like it blocked other windows), so they are reset once.
+   */
+  const legacy = Number(raw.version ?? 1) < 2
+
   return {
-    version: 1,
+    version: 2,
     sources,
     appearance,
     overlay: {
-      clickThrough: raw.overlay?.clickThrough !== false,
+      clickThrough: legacy ? true : raw.overlay?.clickThrough !== false,
       visible: raw.overlay?.visible !== false,
       chat: normalizeChat(raw.overlay),
-      pollCursor: raw.overlay?.pollCursor !== false
+      pollCursor: raw.overlay?.pollCursor === true
     },
     twitch: { clientId: String(raw.twitch?.clientId ?? '') }
   }

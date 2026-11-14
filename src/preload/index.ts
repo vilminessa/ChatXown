@@ -50,6 +50,9 @@ const api = {
   setChat: (rect: ScreenRect | null): Promise<AppConfig> => ipcRenderer.invoke(IPC.chatSet, rect),
   onPanelToggle: (callback: () => void): (() => void) =>
     subscribe<unknown>(IPC.panelToggle, () => callback()),
+  /** Main reports a click-through toggle so the overlay can show a toast. */
+  onCapture: (callback: (payload: { clickThrough: boolean }) => void): (() => void) =>
+    subscribe<{ clickThrough: boolean }>(IPC.overlayCapture, callback),
   openExternal: (url: string): Promise<void> => ipcRenderer.invoke(IPC.openExternal, url),
 
   authStatus: (): Promise<AuthStatus> => ipcRenderer.invoke(IPC.authStatus),
