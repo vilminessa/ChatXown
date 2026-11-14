@@ -126,7 +126,11 @@ function insideZone(point: { x: number; y: number }): boolean {
 function pollCursor(): void {
   if (!overlay || overlay.isDestroyed()) return
   const config = store.get()
-  if (!config.overlay.visible || !config.overlay.pollCursor || !config.overlay.clickThrough) return
+  // A fullscreen chat area is the whole window, so polling cannot tell "over the chat" apart
+  // from "anywhere" — the renderer already decides that case. Polling needs a concrete rect.
+  if (!config.overlay.visible || !config.overlay.pollCursor || !config.overlay.clickThrough || !config.overlay.chat) {
+    return
+  }
 
   const area = workArea()
   const cursor = screen.getCursorScreenPoint()
