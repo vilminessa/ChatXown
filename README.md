@@ -93,7 +93,7 @@ src/preload/        contextBridge API
 src/renderer/       overlay (лента) и settings (настройки)
 src/shared/         общие типы и разбор входных ссылок
 scripts/            тесты, генератор иконки, probe IRC/YouTube, сборка youtubei.js
-.github/workflows/  CI-сборка exe на тегах v*
+.github/workflows/  CI (typecheck+tests) и сборка exe на тегах v*
 ```
 
 ## Технические заметки
