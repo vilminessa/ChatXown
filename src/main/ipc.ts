@@ -3,17 +3,25 @@ import { IPC } from '../shared/ipc'
 import type {
   AddSourceResult,
   AppConfig,
+  AuthStatus,
+  DeviceFlowStart,
+  DevicePollResult,
+  ModRequest,
+  ModResult,
   OverlayAction,
   Platform,
   SourceConfig,
   SourceStatus
 } from '../shared/types'
 import { makeSource, parseSourceInput, store } from './store'
+import { auth } from './twitch/auth'
+import { performModeration } from './twitch/moderation'
 
 export interface IpcDeps {
   getStatuses: () => SourceStatus[]
   overlayAction: (action: OverlayAction) => void
   openSettings: () => void
+  broadcast: (channel: string, payload: unknown) => void
 }
 
 const MAX_SOURCES = 24
@@ -25,9 +33,10 @@ export function registerIpc(deps: IpcDeps): void {
 
   ipcMain.handle(
     IPC.stateGet,
-    (): { config: AppConfig; statuses: SourceStatus[] } => ({
+    (): { config: AppConfig; statuses: SourceStatus[]; auth: AuthStatus } => ({
       config: store.get(),
-      statuses: deps.getStatuses()
+      statuses: deps.getStatuses(),
+      auth: auth.status()
     })
   )
 
@@ -112,5 +121,38 @@ export function registerIpc(deps: IpcDeps): void {
 
   ipcMain.handle(IPC.openExternal, (_event, url: string): void => {
     if (/^https?:\/\//i.test(url)) void shell.openExternal(url)
+  })
+
+  ipcMain.handle(IPC.authStatus, (): AuthStatus => auth.status())
+
+  ipcMain.handle(
+    IPC.authDeviceStart,
+    async (_event, clientId: string): Promise<{ ok: boolean; device?: DeviceFlowStart; error?: string }> => {
+      try {
+        const device = await auth.startDevice(clientId)
+        return { ok: true, device }
+      } catch (error) {
+        return { ok: false, error: (error as Error).message }
+      }
+    }
+  )
+
+  ipcMain.handle(IPC.authDevicePoll, async (_event, clientId: string): Promise<DevicePollResult> => {
+    const result = await auth.pollDevice(clientId)
+    if (result.state === 'ok' || result.state === 'error' || result.state === 'expired') {
+      deps.broadcast(IPC.authChanged, result.auth)
+    }
+    return result
+  })
+
+  ipcMain.handle(IPC.authLogout, (): AuthStatus => {
+    auth.logout()
+    const status = auth.status()
+    deps.broadcast(IPC.authChanged, status)
+    return status
+  })
+
+  ipcMain.handle(IPC.modAction, (_event, request: ModRequest): Promise<ModResult> => {
+    return performModeration(request)
   })
 }

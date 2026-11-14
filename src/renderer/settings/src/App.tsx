@@ -1,5 +1,12 @@
-import { useEffect, useState } from 'react'
-import type { AppConfig, Platform, SourceConfig, SourceStatus } from '../../../shared/types'
+import { useEffect, useRef, useState } from 'react'
+import type {
+  AppConfig,
+  AuthStatus,
+  DeviceFlowStart,
+  Platform,
+  SourceConfig,
+  SourceStatus
+} from '../../../shared/types'
 
 const api = window.chatxown
 
@@ -10,25 +17,48 @@ const STATE_LABELS: Record<SourceStatus['state'], string> = {
   error: 'ошибка'
 }
 
+const SCOPE_LABELS: Record<string, string> = {
+  'moderator:manage:banned_users': 'баны и таймауты',
+  'moderator:manage:chat_messages': 'удаление сообщений'
+}
+
 export function App(): React.JSX.Element {
   const [config, setConfig] = useState<AppConfig | null>(null)
   const [statuses, setStatuses] = useState<SourceStatus[]>([])
+  const [auth, setAuth] = useState<AuthStatus | null>(null)
   const [input, setInput] = useState('')
   const [platform, setPlatform] = useState<'auto' | Platform>('auto')
   const [addError, setAddError] = useState('')
+
+  const [clientId, setClientId] = useState('')
+  const [device, setDevice] = useState<DeviceFlowStart | null>(null)
+  const [authBusy, setAuthBusy] = useState(false)
+  const [authError, setAuthError] = useState('')
+  const pollTimer = useRef<number | null>(null)
 
   useEffect(() => {
     void api.getState().then((state) => {
       setConfig(state.config)
       setStatuses(state.statuses)
+      setAuth(state.auth)
+      setClientId(state.config.twitch.clientId)
     })
     const offConfig = api.onConfig((next) => setConfig(next))
     const offStatus = api.onStatus((next) => setStatuses(next))
+    const offAuth = api.onAuthChanged((next) => setAuth(next))
     return () => {
       offConfig()
       offStatus()
+      offAuth()
     }
   }, [])
+
+  useEffect(
+    () => () => {
+      if (pollTimer.current !== null) window.clearTimeout(pollTimer.current)
+    },
+    []
+  )
 
   if (!config) return <div className="loading">Загрузка…</div>
 
@@ -62,12 +92,71 @@ export function App(): React.JSX.Element {
 
   const statusFor = (id: string): SourceStatus | undefined => statuses.find((s) => s.id === id)
 
+  const stopPolling = (): void => {
+    if (pollTimer.current !== null) {
+      window.clearTimeout(pollTimer.current)
+      pollTimer.current = null
+    }
+  }
+
+  const poll = (id: string, interval: number): void => {
+    stopPolling()
+    pollTimer.current = window.setTimeout(async () => {
+      const result = await api.authDevicePoll(id).catch(
+        (error: Error) => ({ state: 'error' as const, auth, error: error.message })
+      )
+      if (result.state === 'pending') {
+        poll(id, interval)
+        return
+      }
+      stopPolling()
+      setDevice(null)
+      setAuth(result.auth)
+      if (result.state !== 'ok') setAuthError(result.error ?? 'Не удалось войти')
+    }, Math.max(2, interval) * 1000)
+  }
+
+  const startLogin = async (): Promise<void> => {
+    const id = clientId.trim()
+    setAuthError('')
+    if (!id) {
+      setAuthError('Сначала вставьте Client ID приложения Twitch')
+      return
+    }
+    setAuthBusy(true)
+    if (id !== config.twitch.clientId) {
+      patch({ twitch: { clientId: id } })
+    }
+    const result = await api.authDeviceStart(id)
+    setAuthBusy(false)
+    if (!result.ok || !result.device) {
+      setAuthError(result.error ?? 'Twitch не выдал код')
+      return
+    }
+    setDevice(result.device)
+    void api.openExternal(result.device.verificationUri)
+    poll(id, result.device.interval)
+  }
+
+  const cancelLogin = (): void => {
+    stopPolling()
+    setDevice(null)
+    setAuthError('')
+  }
+
+  const logout = async (): Promise<void> => {
+    cancelLogin()
+    setAuth(await api.authLogout())
+  }
+
+  const scopeChips = (auth?.scopes ?? []).map((scope) => SCOPE_LABELS[scope] ?? scope)
+
   return (
     <div className="app">
       <header className="topbar">
         <div>
           <h1>ChatXown</h1>
-          <p className="sub">Оверлей чата Twitch · скоро YouTube</p>
+          <p className="sub">Оверлей чата Twitch с модерацией · YouTube будет позже</p>
         </div>
         <button className="ghost" onClick={() => void api.overlayAction('show')}>
           Показать оверлей
@@ -75,6 +164,103 @@ export function App(): React.JSX.Element {
       </header>
 
       <main>
+        <section className="card">
+          <div className="card-head">
+            <h2>Аккаунт Twitch</h2>
+            {auth?.loggedIn && <span className="pill pill-ok">@ {auth.login}</span>}
+          </div>
+
+          {auth?.loggedIn ? (
+            <>
+              <p className="muted small">
+                Вход выполнен. В интерактивном режиме оверлея (Ctrl+Alt+O) при наведении на сообщение
+                появляются кнопки удаления, таймаута и бана.
+              </p>
+              <div className="chips">
+                {scopeChips.length > 0 ? (
+                  scopeChips.map((label) => (
+                    <span className="chip chip-scope" key={label}>
+                      {label}
+                    </span>
+                  ))
+                ) : (
+                  <span className="muted small">Разрешения не указаны</span>
+                )}
+              </div>
+              <div className="row">
+                <button className="ghost danger" onClick={() => void logout()}>
+                  Выйти из Twitch
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="muted small">
+                Для модерации нужен OAuth-вход. Создайте приложение в{' '}
+                <a
+                  className="link"
+                  href="#"
+                  onClick={(event) => {
+                    event.preventDefault()
+                    void api.openExternal('https://dev.twitch.tv/console/apps')
+                  }}
+                >
+                  Twitch Developer Console
+                </a>{' '}
+                (OAuth redirect URL — <code>http://localhost</code>), скопируйте <b>Client ID</b> и вставьте
+                сюда. Client Secret не нужен.
+              </p>
+
+              <div className="auth-row">
+                <input
+                  value={clientId}
+                  onChange={(event) => setClientId(event.target.value)}
+                  placeholder="Client ID приложения Twitch"
+                  spellCheck={false}
+                />
+                <button className="primary" disabled={authBusy || Boolean(device)} onClick={() => void startLogin()}>
+                  {authBusy ? 'Запрашиваем…' : 'Войти через Twitch'}
+                </button>
+              </div>
+
+              {clientId.trim() !== config.twitch.clientId && clientId.trim() !== '' && (
+                <p className="muted small">Client ID сохранится при входе.</p>
+              )}
+
+              {device && (
+                <div className="device">
+                  <div className="device-code">{device.userCode}</div>
+                  <div className="device-side">
+                    <p className="small">
+                      Введите этот код на{' '}
+                      <a
+                        className="link"
+                        href="#"
+                        onClick={(event) => {
+                          event.preventDefault()
+                          void api.openExternal(device.verificationUri)
+                        }}
+                      >
+                        {device.verificationUri.replace(/^https?:\/\//, '')}
+                      </a>{' '}
+                      и подтвердите доступ.
+                    </p>
+                    <p className="muted small">
+                      <span className="spinner" /> Ждём подтверждения… Код действует{' '}
+                      {Math.round(device.expiresIn / 60)} мин.
+                    </p>
+                    <button className="ghost" onClick={cancelLogin}>
+                      Отмена
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {authError && <p className="error">{authError}</p>}
+            </>
+          )}
+        </section>
+
         <section className="card">
           <div className="card-head">
             <h2>Источники</h2>
@@ -332,7 +518,8 @@ export function App(): React.JSX.Element {
           </div>
           <ul className="keys">
             <li>
-              <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>O</kbd> — переключить сквозной режим
+              <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>O</kbd> — переключить сквозной режим (кнопки
+              модерации работают только в интерактивном режиме)
             </li>
             <li>
               <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>H</kbd> — скрыть / показать оверлей

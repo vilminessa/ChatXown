@@ -1,17 +1,49 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import type { AppConfig, ChatEvent, ClearPayload, SourceStatus } from '../../../shared/types'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type {
+  AppConfig,
+  AuthStatus,
+  ChatEvent,
+  ClearPayload,
+  ModAction,
+  SourceStatus
+} from '../../../shared/types'
 import { Feed } from './Feed'
 
 const api = window.chatxown
 
+interface Toast {
+  id: number
+  text: string
+  kind: 'ok' | 'error'
+}
+
+const ACTION_RESULT: Record<ModAction, string> = {
+  delete: 'Сообщение удалено',
+  timeout: 'Таймаут 10 минут',
+  ban: 'Пользователь забанен',
+  unban: 'Пользователь разбанен'
+}
+
 export function App(): React.JSX.Element {
   const [config, setConfig] = useState<AppConfig | null>(null)
   const [statuses, setStatuses] = useState<SourceStatus[]>([])
+  const [auth, setAuth] = useState<AuthStatus | null>(null)
   const [events, setEvents] = useState<ChatEvent[]>([])
+  const [toasts, setToasts] = useState<Toast[]>([])
 
   const configRef = useRef<AppConfig | null>(null)
   const pending = useRef<ChatEvent[]>([])
   const frame = useRef<number | null>(null)
+  const toastId = useRef(0)
+
+  const notify = useCallback((text: string, kind: 'ok' | 'error' = 'ok') => {
+    toastId.current += 1
+    const id = toastId.current
+    setToasts((prev) => [...prev.slice(-2), { id, text, kind }])
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((toast) => toast.id !== id))
+    }, 4000)
+  }, [])
 
   useEffect(() => {
     configRef.current = config
@@ -22,6 +54,7 @@ export function App(): React.JSX.Element {
       setConfig(state.config)
       configRef.current = state.config
       setStatuses(state.statuses)
+      setAuth(state.auth)
     })
 
     const offEvent = api.onEvent((event) => {
@@ -61,12 +94,14 @@ export function App(): React.JSX.Element {
       setConfig(next)
       configRef.current = next
     })
+    const offAuth = api.onAuthChanged((next) => setAuth(next))
 
     return () => {
       offEvent()
       offClear()
       offStatus()
       offConfig()
+      offAuth()
     }
   }, [])
 
@@ -87,7 +122,25 @@ export function App(): React.JSX.Element {
     return map
   }, [config?.sources])
 
+  const moderate = useCallback(
+    async (event: ChatEvent, action: ModAction) => {
+      const result = await api.moderate({
+        sourceId: event.sourceId,
+        action,
+        messageId: action === 'delete' ? event.id : undefined,
+        userId: event.author.userId,
+        userName: event.author.name,
+        duration: action === 'timeout' ? 600 : undefined
+      })
+      notify(result.ok ? ACTION_RESULT[action] : (result.error ?? 'Не удалось выполнить действие'), result.ok ? 'ok' : 'error')
+    },
+    [notify]
+  )
+
   if (!config) return <div className="loading">ChatXown</div>
+
+  const interactive = !config.overlay.clickThrough
+  const canModerate = interactive && Boolean(auth?.loggedIn)
 
   return (
     <div
@@ -97,7 +150,7 @@ export function App(): React.JSX.Element {
         ['--max-width' as string]: `${config.appearance.maxBubbleWidth}px`
       }}
     >
-      {!config.overlay.clickThrough && (
+      {interactive && (
         <header className="chrome">
           <div className="chrome-drag">
             <span className="chrome-title">ChatXown</span>
@@ -109,6 +162,11 @@ export function App(): React.JSX.Element {
                   title={`${status.channel}: ${status.detail ?? status.state}`}
                 />
               ))}
+              {auth?.loggedIn && (
+                <span className="auth-chip" title={`Twitch: ${auth.login ?? ''}`}>
+                  @{auth.login}
+                </span>
+              )}
             </span>
           </div>
           <div className="chrome-actions">
@@ -124,7 +182,21 @@ export function App(): React.JSX.Element {
           </div>
         </header>
       )}
-      <Feed events={events} config={config} accentById={accentById} />
+      <Feed
+        events={events}
+        config={config}
+        accentById={accentById}
+        canModerate={canModerate}
+        selfUserId={auth?.userId}
+        onModerate={moderate}
+      />
+      <div className="toasts">
+        {toasts.map((toast) => (
+          <div key={toast.id} className={`toast toast-${toast.kind}`}>
+            {toast.text}
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

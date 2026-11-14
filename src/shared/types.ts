@@ -140,3 +140,50 @@ export interface AddSourceResult {
   error?: string
   config?: AppConfig
 }
+
+/* ---------------------------------- auth --------------------------------- */
+
+export interface AuthStatus {
+  loggedIn: boolean
+  login?: string
+  userId?: string
+  scopes?: string[]
+  hasClientId: boolean
+}
+
+export interface DeviceFlowStart {
+  userCode: string
+  verificationUri: string
+  expiresIn: number
+  interval: number
+}
+
+export type DevicePollState = 'pending' | 'ok' | 'expired' | 'error'
+
+export interface DevicePollResult {
+  state: DevicePollState
+  auth: AuthStatus
+  error?: string
+}
+
+/* ------------------------------- moderation ------------------------------ */
+
+export type ModAction = 'delete' | 'timeout' | 'ban' | 'unban'
+
+export interface ModRequest {
+  sourceId: string
+  action: ModAction
+  /** ChatEvent.id (sourceId:twitchMessageId) */
+  messageId?: string
+  /** Twitch user id of the target */
+  userId?: string
+  userName?: string
+  /** timeout duration in seconds */
+  duration?: number
+  reason?: string
+}
+
+export interface ModResult {
+  ok: boolean
+  error?: string
+}

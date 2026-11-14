@@ -1,14 +1,24 @@
 import { useEffect, useRef, useState } from 'react'
-import type { AppearanceConfig, ChatEvent } from '../../../shared/types'
+import type { AppearanceConfig, ChatEvent, ModAction } from '../../../shared/types'
 import { Message } from './Message'
 
 interface FeedProps {
   events: ChatEvent[]
   config: { appearance: AppearanceConfig }
   accentById: Map<string, string>
+  canModerate?: boolean
+  selfUserId?: string
+  onModerate?: (event: ChatEvent, action: ModAction) => void
 }
 
-export function Feed({ events, config, accentById }: FeedProps): React.JSX.Element {
+export function Feed({
+  events,
+  config,
+  accentById,
+  canModerate = false,
+  selfUserId,
+  onModerate
+}: FeedProps): React.JSX.Element {
   const scroller = useRef<HTMLDivElement>(null)
   const stick = useRef(true)
   const [showHint, setShowHint] = useState(true)
@@ -43,6 +53,9 @@ export function Feed({ events, config, accentById }: FeedProps): React.JSX.Eleme
             event={event}
             appearance={config.appearance}
             accent={accentById.get(event.sourceId)}
+            canModerate={canModerate}
+            selfUserId={selfUserId}
+            onModerate={onModerate}
           />
         ))}
         {events.length === 0 && showHint && <div className="hint">ChatXown · ждём сообщения…</div>}

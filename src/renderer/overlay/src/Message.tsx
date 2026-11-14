@@ -1,9 +1,13 @@
-import type { AppearanceConfig, ChatEvent } from '../../../shared/types'
+import { useEffect, useState } from 'react'
+import type { AppearanceConfig, ChatEvent, ModAction } from '../../../shared/types'
 
 interface MessageProps {
   event: ChatEvent
   appearance: AppearanceConfig
   accent?: string
+  canModerate?: boolean
+  selfUserId?: string
+  onModerate?: (event: ChatEvent, action: ModAction) => void
 }
 
 const SYSTEM_KINDS = new Set(['sub', 'resub', 'gift', 'raid', 'system'])
@@ -12,13 +16,40 @@ function formatTime(ts: number): string {
   return new Date(ts).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
 }
 
-export function Message({ event, appearance, accent }: MessageProps): React.JSX.Element {
+export function Message({
+  event,
+  appearance,
+  accent,
+  canModerate = false,
+  selfUserId,
+  onModerate
+}: MessageProps): React.JSX.Element {
   const isSystem = SYSTEM_KINDS.has(event.kind)
   const isAction = event.kind === 'action'
+  const [armed, setArmed] = useState(false)
+
+  useEffect(() => {
+    if (!armed) return
+    const timer = setTimeout(() => setArmed(false), 3000)
+    return () => clearTimeout(timer)
+  }, [armed])
 
   const className = ['msg', `kind-${event.kind}`, isSystem ? 'system' : '', isAction ? 'action' : '']
     .filter(Boolean)
     .join(' ')
+
+  const moddable =
+    canModerate &&
+    Boolean(onModerate) &&
+    event.platform === 'twitch' &&
+    !isSystem &&
+    Boolean(event.author.userId) &&
+    event.author.userId !== selfUserId
+
+  const act = (action: ModAction): void => {
+    setArmed(false)
+    onModerate?.(event, action)
+  }
 
   return (
     <div
@@ -74,6 +105,24 @@ export function Message({ event, appearance, accent }: MessageProps): React.JSX.
             )}
           </span>
         </>
+      )}
+
+      {moddable && (
+        <span className="mod-bar">
+          <button className="mod-btn" title="Удалить сообщение" onClick={() => act('delete')}>
+            ⌫
+          </button>
+          <button className="mod-btn" title="Таймаут на 10 минут" onClick={() => act('timeout')}>
+            10м
+          </button>
+          <button
+            className={`mod-btn mod-btn-ban ${armed ? 'armed' : ''}`}
+            title={armed ? 'Нажмите ещё раз, чтобы забанить' : 'Забанить навсегда'}
+            onClick={() => (armed ? act('ban') : setArmed(true))}
+          >
+            {armed ? 'Точно?' : 'Бан'}
+          </button>
+        </span>
       )}
     </div>
   )

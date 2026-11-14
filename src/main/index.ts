@@ -8,6 +8,7 @@ import { IPC } from '../shared/ipc'
 import type { AppConfig } from '../shared/types'
 import { store } from './store'
 import { createTray, destroyTray, refreshTray } from './tray'
+import { auth } from './twitch/auth'
 import {
   applyOverlayConfig,
   createOverlay,
@@ -35,6 +36,7 @@ function broadcast(channel: string, payload: unknown): void {
 function start(): void {
   store.init()
   initEmoteCache(join(app.getPath('userData'), 'emotes-cache.json'))
+  auth.init(join(app.getPath('userData'), 'auth.json'))
 
   createOverlay()
 
@@ -77,7 +79,8 @@ function start(): void {
   registerIpc({
     getStatuses: () => manager?.getStatuses() ?? [],
     overlayAction,
-    openSettings
+    openSettings,
+    broadcast
   })
 
   createTray()

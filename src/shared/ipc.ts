@@ -9,10 +9,19 @@ export const IPC = {
   openSettings: 'app:open-settings',
   openExternal: 'app:open-external',
 
+  authStatus: 'auth:status',
+  authDeviceStart: 'auth:device-start',
+  authDevicePoll: 'auth:device-poll',
+  authLogout: 'auth:logout',
+
+  modAction: 'mod:action',
+  modList: 'mod:list',
+
   chatEvent: 'chat:event',
   chatClear: 'chat:clear',
   chatStatus: 'chat:status',
-  configChanged: 'config:changed'
+  configChanged: 'config:changed',
+  authChanged: 'auth:changed'
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]
