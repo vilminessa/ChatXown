@@ -1,11 +1,11 @@
 import { app, Menu, Tray, nativeImage } from 'electron'
 import { store } from './store'
 import {
-  openSettings,
   overlayAction,
   resourcePath,
   toggleClickThrough,
-  toggleOverlayVisible
+  toggleOverlayVisible,
+  togglePanel
 } from './windows'
 
 let tray: Tray | null = null
@@ -25,7 +25,7 @@ function buildMenu(): Menu {
       checked: config.overlay.clickThrough,
       click: () => toggleClickThrough()
     },
-    { label: 'Настройки…', click: () => openSettings() },
+    { label: 'Настройки (Ctrl+Alt+S)', click: () => togglePanel() },
     { type: 'separator' },
     {
       label: 'Выход',
@@ -48,7 +48,7 @@ export function createTray(): void {
   tray = new Tray(icon.isEmpty() ? nativeImage.createEmpty() : icon)
 
   if (process.platform === 'win32') {
-    tray.on('double-click', () => openSettings())
+    tray.on('double-click', () => togglePanel())
   }
   tray.on('click', () => toggleOverlayVisible())
 

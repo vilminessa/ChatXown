@@ -8,8 +8,10 @@ import type {
   AppearanceConfig,
   EmoteProviders,
   Platform,
+  ScreenRect,
   SourceConfig
 } from '../shared/types'
+import { MIN_CHAT } from '../shared/layout'
 import { parseSourceInput } from '../shared/sources'
 
 export const ACCENTS = ['#9146ff', '#ff5b5b', '#4ecdc4', '#ffb347', '#7dd3fc', '#f472b6']
@@ -30,7 +32,7 @@ export function defaultConfig(): AppConfig {
     version: 1,
     sources: [makeSource('twitch', 'vilminessa_', 0)],
     appearance: { ...DEFAULT_APPEARANCE },
-    overlay: { clickThrough: true, visible: true, bounds: null },
+    overlay: { clickThrough: true, visible: true, chat: null },
     twitch: { clientId: '' }
   }
 }
@@ -109,19 +111,27 @@ export function sanitizeConfig(raw: any): AppConfig {
     maxBubbleWidth: Math.round(clamp(Number(a.maxBubbleWidth), 160, 1200, DEFAULT_APPEARANCE.maxBubbleWidth))
   }
 
-  const bounds = raw.overlay?.bounds
-  const normalizedBounds =
-    bounds &&
-    [bounds.x, bounds.y, bounds.width, bounds.height].every((v: unknown) => Number.isFinite(v)) &&
-    Number(bounds.width) > 120 &&
-    Number(bounds.height) > 120
-      ? {
-          x: Math.round(Number(bounds.x)),
-          y: Math.round(Number(bounds.y)),
-          width: Math.round(Number(bounds.width)),
-          height: Math.round(Number(bounds.height))
-        }
-      : null
+  /** `chat` replaced the old window `bounds`; both shapes are accepted. */
+  function normalizeChat(raw: any): ScreenRect | null {
+    const legacy = raw?.chat ?? raw?.bounds
+    if (!legacy || typeof legacy !== 'object') return null
+    const width = Math.round(Number(legacy.width))
+    const height = Math.round(Number(legacy.height))
+    if (
+      !Number.isFinite(width) ||
+      !Number.isFinite(height) ||
+      width < MIN_CHAT.width ||
+      height < MIN_CHAT.height
+    ) {
+      return null
+    }
+    return {
+      x: Math.round(clamp(Number(legacy.x), 0, 100_000, 0)),
+      y: Math.round(clamp(Number(legacy.y), 0, 100_000, 0)),
+      width,
+      height
+    }
+  }
 
   return {
     version: 1,
@@ -130,7 +140,7 @@ export function sanitizeConfig(raw: any): AppConfig {
     overlay: {
       clickThrough: raw.overlay?.clickThrough !== false,
       visible: raw.overlay?.visible !== false,
-      bounds: normalizedBounds
+      chat: normalizeChat(raw.overlay)
     },
     twitch: { clientId: String(raw.twitch?.clientId ?? '') }
   }

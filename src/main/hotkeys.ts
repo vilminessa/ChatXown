@@ -3,7 +3,7 @@ import { globalShortcut } from 'electron'
 export interface HotkeyHandlers {
   toggleClickThrough: () => void
   toggleVisible: () => void
-  openSettings: () => void
+  togglePanel: () => void
 }
 
 export function registerHotkeys(handlers: HotkeyHandlers): void {
@@ -18,7 +18,7 @@ export function registerHotkeys(handlers: HotkeyHandlers): void {
 
   bind('Control+Alt+O', handlers.toggleClickThrough)
   bind('Control+Alt+H', handlers.toggleVisible)
-  bind('Control+Alt+S', handlers.openSettings)
+  bind('Control+Alt+S', handlers.togglePanel)
 }
 
 export function unregisterHotkeys(): void {

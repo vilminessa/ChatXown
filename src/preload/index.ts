@@ -8,10 +8,12 @@ import type {
   ClearPayload,
   DeviceFlowStart,
   DevicePollResult,
+  InteractiveState,
   ModRequest,
   ModResult,
   OverlayAction,
   Platform,
+  ScreenRect,
   SourceConfig,
   SourceStatus
 } from '../shared/types'
@@ -41,7 +43,13 @@ const api = {
   removeSource: (id: string): Promise<AppConfig> => ipcRenderer.invoke(IPC.sourcesRemove, id),
   overlayAction: (action: OverlayAction): Promise<void> =>
     ipcRenderer.invoke(IPC.overlayAction, action),
-  openSettings: (): Promise<void> => ipcRenderer.invoke(IPC.openSettings),
+  /** Report whether the pointer sits over a UI zone that must capture input. */
+  setInteractive: (state: InteractiveState): void =>
+    ipcRenderer.send(IPC.overlayInteractive, state),
+  /** Persist the chat area rect (null = fill the whole overlay). */
+  setChat: (rect: ScreenRect | null): Promise<AppConfig> => ipcRenderer.invoke(IPC.chatSet, rect),
+  onPanelToggle: (callback: () => void): (() => void) =>
+    subscribe<unknown>(IPC.panelToggle, () => callback()),
   openExternal: (url: string): Promise<void> => ipcRenderer.invoke(IPC.openExternal, url),
 
   authStatus: (): Promise<AuthStatus> => ipcRenderer.invoke(IPC.authStatus),

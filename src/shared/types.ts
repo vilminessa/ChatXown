@@ -38,25 +38,37 @@ export interface AppearanceConfig {
   maxBubbleWidth: number
 }
 
-export interface WindowBounds {
+export interface ScreenRect {
   x: number
   y: number
   width: number
   height: number
 }
 
+export interface OverlayConfig {
+  clickThrough: boolean
+  visible: boolean
+  /**
+   * Chat area inside the fullscreen overlay window, in window coordinates (DIP).
+   * `null` means the chat fills the whole overlay window.
+   */
+  chat: ScreenRect | null
+}
+
 export interface AppConfig {
   version: number
   sources: SourceConfig[]
   appearance: AppearanceConfig
-  overlay: {
-    clickThrough: boolean
-    visible: boolean
-    bounds: WindowBounds | null
-  }
+  overlay: OverlayConfig
   twitch: {
     clientId: string
   }
+}
+
+/** Renderer asks main to capture mouse (and optionally keyboard focus) for a UI zone. */
+export interface InteractiveState {
+  interactive: boolean
+  focus: boolean
 }
 
 export interface SourceStatus {
@@ -130,13 +142,7 @@ export interface ClearPayload {
   all?: boolean
 }
 
-export type OverlayAction =
-  | 'toggle-click-through'
-  | 'set-click-through'
-  | 'hide'
-  | 'show'
-  | 'open-settings'
-  | 'close'
+export type OverlayAction = 'toggle-click-through' | 'hide' | 'show' | 'close'
 
 export interface AddSourceResult {
   ok: boolean

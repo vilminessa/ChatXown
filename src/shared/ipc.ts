@@ -6,7 +6,12 @@ export const IPC = {
   sourcesRemove: 'sources:remove',
   stateGet: 'state:get',
   overlayAction: 'overlay:action',
-  openSettings: 'app:open-settings',
+  /** renderer reports whether the pointer is over an interactive UI zone */
+  overlayInteractive: 'overlay:interactive',
+  /** renderer persists the chat area rect (null = full screen) */
+  chatSet: 'overlay:chat',
+  /** main asks the overlay to open/close the settings modal */
+  panelToggle: 'overlay:panel',
   openExternal: 'app:open-external',
 
   authStatus: 'auth:status',

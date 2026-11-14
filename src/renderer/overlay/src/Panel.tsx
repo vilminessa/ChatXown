@@ -23,36 +23,36 @@ const SCOPE_LABELS: Record<string, string> = {
   'moderator:manage:chat_messages': 'удаление сообщений'
 }
 
-export function App(): React.JSX.Element {
-  const [config, setConfig] = useState<AppConfig | null>(null)
-  const [statuses, setStatuses] = useState<SourceStatus[]>([])
-  const [auth, setAuth] = useState<AuthStatus | null>(null)
+interface PanelProps {
+  config: AppConfig
+  statuses: SourceStatus[]
+  auth: AuthStatus | null
+  patch: (patch: unknown) => void
+  onClose: () => void
+  notify: (text: string, kind?: 'ok' | 'error') => void
+}
+
+export function Panel({ config, statuses, auth, patch, onClose, notify }: PanelProps): React.JSX.Element {
   const [input, setInput] = useState('')
   const [platform, setPlatform] = useState<'auto' | Platform>('auto')
   const [addError, setAddError] = useState('')
+  const [armedDelete, setArmedDelete] = useState<string | null>(null)
 
-  const [clientId, setClientId] = useState('')
+  const [clientId, setClientId] = useState(config.twitch.clientId)
   const [device, setDevice] = useState<DeviceFlowStart | null>(null)
   const [authBusy, setAuthBusy] = useState(false)
   const [authError, setAuthError] = useState('')
   const pollTimer = useRef<number | null>(null)
 
   useEffect(() => {
-    void api.getState().then((state) => {
-      setConfig(state.config)
-      setStatuses(state.statuses)
-      setAuth(state.auth)
-      setClientId(state.config.twitch.clientId)
-    })
-    const offConfig = api.onConfig((next) => setConfig(next))
-    const offStatus = api.onStatus((next) => setStatuses(next))
-    const offAuth = api.onAuthChanged((next) => setAuth(next))
-    return () => {
-      offConfig()
-      offStatus()
-      offAuth()
-    }
-  }, [])
+    setClientId(config.twitch.clientId)
+  }, [config.twitch.clientId])
+
+  useEffect(() => {
+    if (!armedDelete) return
+    const timer = setTimeout(() => setArmedDelete(null), 4000)
+    return () => clearTimeout(timer)
+  }, [armedDelete])
 
   useEffect(
     () => () => {
@@ -60,36 +60,6 @@ export function App(): React.JSX.Element {
     },
     []
   )
-
-  if (!config) return <div className="loading">Загрузка…</div>
-
-  const patch = (p: unknown): void => {
-    void api.patchConfig(p).then(setConfig)
-  }
-
-  const addSource = async (): Promise<void> => {
-    setAddError('')
-    const result = await api.addSource(input, platform === 'auto' ? undefined : platform)
-    if (!result.ok) {
-      setAddError(result.error ?? 'Не удалось добавить источник')
-      return
-    }
-    setInput('')
-    if (result.config) setConfig(result.config)
-  }
-
-  const updateSource = async (id: string, p: Partial<SourceConfig>): Promise<void> => {
-    const result = await api.updateSource(id, p)
-    if (result.config) setConfig(result.config)
-    if (!result.ok && result.error) setAddError(result.error)
-  }
-
-  const removeSource = async (source: SourceConfig): Promise<void> => {
-    if (!confirm(`Удалить ${source.platform === 'twitch' ? 'Twitch' : 'YouTube'}-канал «${source.label}»?`)) {
-      return
-    }
-    setConfig(await api.removeSource(source.id))
-  }
 
   const statusFor = (id: string): SourceStatus | undefined => statuses.find((s) => s.id === id)
 
@@ -103,16 +73,17 @@ export function App(): React.JSX.Element {
   const poll = (id: string, interval: number): void => {
     stopPolling()
     pollTimer.current = window.setTimeout(async () => {
-      const result = await api.authDevicePoll(id).catch(
-        (error: Error) => ({ state: 'error' as const, auth, error: error.message })
-      )
+      const result = await api.authDevicePoll(id).catch((error: Error) => ({
+        state: 'error' as const,
+        auth,
+        error: error.message
+      }))
       if (result.state === 'pending') {
         poll(id, interval)
         return
       }
       stopPolling()
       setDevice(null)
-      setAuth(result.auth)
       if (result.state !== 'ok') setAuthError(result.error ?? 'Не удалось войти')
     }, Math.max(2, interval) * 1000)
   }
@@ -125,9 +96,7 @@ export function App(): React.JSX.Element {
       return
     }
     setAuthBusy(true)
-    if (id !== config.twitch.clientId) {
-      patch({ twitch: { clientId: id } })
-    }
+    if (id !== config.twitch.clientId) patch({ twitch: { clientId: id } })
     const result = await api.authDeviceStart(id)
     setAuthBusy(false)
     if (!result.ok || !result.device) {
@@ -147,24 +116,54 @@ export function App(): React.JSX.Element {
 
   const logout = async (): Promise<void> => {
     cancelLogin()
-    setAuth(await api.authLogout())
+    await api.authLogout()
+  }
+
+  const addSource = async (): Promise<void> => {
+    setAddError('')
+    const result = await api.addSource(input, platform === 'auto' ? undefined : platform)
+    if (!result.ok) {
+      setAddError(result.error ?? 'Не удалось добавить источник')
+      return
+    }
+    setInput('')
+    notify('Источник добавлен')
+  }
+
+  const updateSource = async (id: string, p: Partial<SourceConfig>): Promise<void> => {
+    const result = await api.updateSource(id, p)
+    if (!result.ok && result.error) setAddError(result.error)
+  }
+
+  const removeSource = async (source: SourceConfig): Promise<void> => {
+    if (armedDelete !== source.id) {
+      setArmedDelete(source.id)
+      return
+    }
+    setArmedDelete(null)
+    await api.removeSource(source.id)
+    notify('Источник удалён')
   }
 
   const scopeChips = (auth?.scopes ?? []).map((scope) => SCOPE_LABELS[scope] ?? scope)
 
   return (
-    <div className="app">
-      <header className="topbar">
-        <div>
+    <div
+      className="modal-backdrop"
+      data-interactive=""
+      onPointerDown={(event) => {
+        if (event.target === event.currentTarget) onClose()
+      }}
+    >
+      <div className="modal" role="dialog" aria-label="Настройки ChatXown">
+        <header className="modal-head">
           <h1>ChatXown</h1>
           <p className="sub">Оверлей чата Twitch и YouTube · модерация Twitch</p>
-        </div>
-        <button className="ghost" onClick={() => void api.overlayAction('show')}>
-          Показать оверлей
-        </button>
-      </header>
+          <button className="ghost" title="Закрыть (Esc)" onClick={onClose}>
+            ✕
+          </button>
+        </header>
 
-      <main>
         <section className="card">
           <div className="card-head">
             <h2>Аккаунт Twitch</h2>
@@ -174,8 +173,8 @@ export function App(): React.JSX.Element {
           {auth?.loggedIn ? (
             <>
               <p className="muted small">
-                Вход выполнен. В интерактивном режиме оверлея (Ctrl+Alt+O) при наведении на сообщение
-                появляются кнопки удаления, таймаута и бана.
+                Вход выполнен. При наведении на сообщение появляются кнопки удаления, таймаута и бана
+                (когда курсор захватывает оверлей).
               </p>
               <div className="chips">
                 {scopeChips.length > 0 ? (
@@ -298,6 +297,7 @@ export function App(): React.JSX.Element {
             )}
             {config.sources.map((source) => {
               const status = statusFor(source.id)
+              const armed = armedDelete === source.id
               return (
                 <div className={`source ${source.enabled ? '' : 'disabled'}`} key={source.id}>
                   <div className="source-main">
@@ -334,10 +334,7 @@ export function App(): React.JSX.Element {
                       }}
                     />
 
-                    <span
-                      className={`status status-${status?.state ?? 'idle'}`}
-                      title={status?.detail ?? ''}
-                    >
+                    <span className={`status status-${status?.state ?? 'idle'}`} title={status?.detail ?? ''}>
                       {STATE_LABELS[status?.state ?? 'idle']}
                     </span>
 
@@ -349,8 +346,8 @@ export function App(): React.JSX.Element {
                       title="Цвет источника"
                     />
 
-                    <button className="danger ghost" onClick={() => void removeSource(source)}>
-                      Удалить
+                    <button className={armed ? 'primary danger' : 'danger ghost'} onClick={() => void removeSource(source)}>
+                      {armed ? 'Точно удалить?' : 'Удалить'}
                     </button>
                   </div>
 
@@ -426,9 +423,7 @@ export function App(): React.JSX.Element {
                 min={0}
                 max={100}
                 value={Math.round(config.appearance.opacity * 100)}
-                onChange={(event) =>
-                  patch({ appearance: { opacity: Number(event.target.value) / 100 } })
-                }
+                onChange={(event) => patch({ appearance: { opacity: Number(event.target.value) / 100 } })}
               />
             </label>
 
@@ -440,9 +435,7 @@ export function App(): React.JSX.Element {
                 max={900}
                 step={10}
                 value={config.appearance.maxBubbleWidth}
-                onChange={(event) =>
-                  patch({ appearance: { maxBubbleWidth: Number(event.target.value) } })
-                }
+                onChange={(event) => patch({ appearance: { maxBubbleWidth: Number(event.target.value) } })}
               />
             </label>
 
@@ -454,9 +447,7 @@ export function App(): React.JSX.Element {
                 max={500}
                 step={10}
                 value={config.appearance.maxMessages}
-                onChange={(event) =>
-                  patch({ appearance: { maxMessages: Number(event.target.value) } })
-                }
+                onChange={(event) => patch({ appearance: { maxMessages: Number(event.target.value) } })}
               />
             </label>
 
@@ -464,9 +455,7 @@ export function App(): React.JSX.Element {
               <span>Скрывать через</span>
               <select
                 value={config.appearance.hideAfterMs}
-                onChange={(event) =>
-                  patch({ appearance: { hideAfterMs: Number(event.target.value) } })
-                }
+                onChange={(event) => patch({ appearance: { hideAfterMs: Number(event.target.value) } })}
               >
                 <option value={0}>никогда</option>
                 <option value={15000}>15 сек</option>
@@ -516,37 +505,42 @@ export function App(): React.JSX.Element {
                 checked={config.overlay.clickThrough}
                 onChange={(event) => patch({ overlay: { clickThrough: event.target.checked } })}
               />
-              Сквозной режим (клики проходят в игру)
+              Сквозной режим (клики проходят под оверлей)
             </label>
             <label className="check">
               <input
                 type="checkbox"
                 checked={config.overlay.visible}
-                onChange={(event) =>
-                  void api.overlayAction(event.target.checked ? 'show' : 'hide')
-                }
+                onChange={(event) => void api.overlayAction(event.target.checked ? 'show' : 'hide')}
               />
               Показывать оверлей
             </label>
           </div>
+          <p className="muted small">
+            Окно оверлея занимает весь экран основного дисплея, чат — область внутри него. Область
+            перетаскивается за шапку, меняется за края и углы, кнопки <kbd>⌜ ⌝ ⌞ ⌟</kbd> прижимают её к
+            углу, <kbd>▣</kbd> растягивает на весь экран. Размер и положение сохраняются.
+          </p>
           <ul className="keys">
             <li>
-              <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>O</kbd> — переключить сквозной режим (кнопки
-              модерации работают только в интерактивном режиме)
+              <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>O</kbd> — сквозной режим выключен/включён: при
+              выключенном оверлей захватывает весь экран, при включённом мышь перехватывается только над
+              чатом, ручками и этой панелью
             </li>
             <li>
               <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>H</kbd> — скрыть / показать оверлей
             </li>
             <li>
-              <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>S</kbd> — настройки
+              <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>S</kbd> — открыть / закрыть эту панель, <kbd>Esc</kbd>{' '}
+              — тоже закрывает
             </li>
           </ul>
           <p className="muted small">
-            В интерактивном режиме оверлей можно перетаскивать за шапку. Поверх эксклюзивного
-            fullscreen оверлей не отображается — используйте borderless/windowed режим игры.
+            Поверх эксклюзивного fullscreen оверлей не отображается — используйте borderless/windowed
+            режим игры.
           </p>
         </section>
-      </main>
+      </div>
     </div>
   )
 }

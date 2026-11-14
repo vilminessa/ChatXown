@@ -6,10 +6,12 @@ import type {
   ClearPayload,
   DeviceFlowStart,
   DevicePollResult,
+  InteractiveState,
   ModRequest,
   ModResult,
   OverlayAction,
   Platform,
+  ScreenRect,
   SourceConfig,
   SourceStatus
 } from '../shared/types'
@@ -28,7 +30,9 @@ export interface ChatXownApi {
   updateSource(id: string, patch: Partial<SourceConfig>): Promise<AddSourceResult>
   removeSource(id: string): Promise<AppConfig>
   overlayAction(action: OverlayAction): Promise<void>
-  openSettings(): Promise<void>
+  setInteractive(state: InteractiveState): void
+  setChat(rect: ScreenRect | null): Promise<AppConfig>
+  onPanelToggle(callback: () => void): () => void
   openExternal(url: string): Promise<void>
 
   authStatus(): Promise<AuthStatus>

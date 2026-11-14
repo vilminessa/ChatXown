@@ -6,10 +6,12 @@ import type {
   AuthStatus,
   DeviceFlowStart,
   DevicePollResult,
+  InteractiveState,
   ModRequest,
   ModResult,
   OverlayAction,
   Platform,
+  ScreenRect,
   SourceConfig,
   SourceStatus
 } from '../shared/types'
@@ -20,8 +22,8 @@ import { performModeration } from './twitch/moderation'
 export interface IpcDeps {
   getStatuses: () => SourceStatus[]
   overlayAction: (action: OverlayAction) => void
-  openSettings: () => void
-  broadcast: (channel: string, payload: unknown) => void
+  setInteractive: (state: InteractiveState) => void
+  broadcast: (channel: string, payload?: unknown) => void
 }
 
 const MAX_SOURCES = 24
@@ -112,8 +114,12 @@ export function registerIpc(deps: IpcDeps): void {
     deps.overlayAction(action)
   })
 
-  ipcMain.handle(IPC.openSettings, (): void => {
-    deps.openSettings()
+  ipcMain.on(IPC.overlayInteractive, (_event, state: InteractiveState): void => {
+    deps.setInteractive(state)
+  })
+
+  ipcMain.handle(IPC.chatSet, (_event, rect: ScreenRect | null): AppConfig => {
+    return store.patch({ overlay: { chat: rect } })
   })
 
   ipcMain.handle(IPC.openExternal, (_event, url: string): void => {

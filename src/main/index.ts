@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, screen, shell } from 'electron'
 import { join } from 'node:path'
 import { initEmoteCache } from './chat/emotes'
 import { ChatManager } from './chat/manager'
@@ -6,17 +6,21 @@ import { registerHotkeys, unregisterHotkeys } from './hotkeys'
 import { registerIpc } from './ipc'
 import { IPC } from '../shared/ipc'
 import type { AppConfig } from '../shared/types'
+import { runUiProbe } from './probe'
 import { store } from './store'
 import { createTray, destroyTray, refreshTray } from './tray'
 import { auth } from './twitch/auth'
 import {
   applyOverlayConfig,
+  bindToDisplay,
   createOverlay,
+  getOverlay,
   markQuitting,
-  openSettings,
   overlayAction,
+  setInteractive,
   toggleClickThrough,
-  toggleOverlayVisible
+  toggleOverlayVisible,
+  togglePanel
 } from './windows'
 
 const singleInstance = app.requestSingleInstanceLock()
@@ -27,7 +31,7 @@ if (!singleInstance) {
 let manager: ChatManager | null = null
 let lastSourcesSignature = ''
 
-function broadcast(channel: string, payload: unknown): void {
+function broadcast(channel: string, payload?: unknown): void {
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed()) win.webContents.send(channel, payload)
   }
@@ -79,12 +83,16 @@ function start(): void {
   registerIpc({
     getStatuses: () => manager?.getStatuses() ?? [],
     overlayAction,
-    openSettings,
+    setInteractive,
     broadcast
   })
 
   createTray()
-  registerHotkeys({ toggleClickThrough, toggleVisible: toggleOverlayVisible, openSettings })
+  registerHotkeys({ toggleClickThrough, toggleVisible: toggleOverlayVisible, togglePanel })
+
+  screen.on('display-added', bindToDisplay)
+  screen.on('display-removed', bindToDisplay)
+  screen.on('display-metrics-changed', bindToDisplay)
 
   if (process.env['CHATXOWN_DEMO']) {
     void import('./demo').then(({ startDemo }) =>
@@ -95,12 +103,20 @@ function start(): void {
     )
   }
 
-  if (process.env['CHATXOWN_OPEN_SETTINGS']) {
-    setTimeout(() => openSettings(), 1500)
+  const probeFile = process.env['CHATXOWN_PROBE']
+  const probeWindow = getOverlay()
+  if (probeFile && probeWindow) {
+    runUiProbe({
+      win: probeWindow,
+      file: probeFile,
+      overlay: () => store.get().overlay,
+      sources: () => store.get().sources.map((source) => source.channel),
+      statuses: () => manager?.getStatuses() ?? []
+    })
   }
 
-  if (process.env['CHATXOWN_CAPTURE']) {
-    const target = process.env['CHATXOWN_CAPTURE']
+  const captureFile = process.env['CHATXOWN_CAPTURE']
+  if (captureFile) {
     setTimeout(() => {
       void (async () => {
         try {
@@ -108,7 +124,7 @@ function start(): void {
           const windows = BrowserWindow.getAllWindows()
           for (let i = 0; i < windows.length; i += 1) {
             const win = windows[i]
-            const file = windows.length === 1 ? target : target.replace(/\.png$/, `-${i}.png`)
+            const file = windows.length === 1 ? captureFile : captureFile.replace(/\.png$/, `-${i}.png`)
             const image = await win.webContents.capturePage()
             writeFileSync(file, image.toPNG())
             const text = await win.webContents
@@ -131,7 +147,7 @@ app.whenReady().then(() => {
 
 app.on('second-instance', () => {
   overlayAction('show')
-  openSettings()
+  togglePanel()
 })
 
 app.on('window-all-closed', () => {
@@ -147,6 +163,11 @@ app.on('before-quit', () => {
 })
 
 app.on('web-contents-created', (_event, contents) => {
+  if (process.env['CHATXOWN_DEBUG']) {
+    contents.on('console-message', (details) => {
+      console.log(`[renderer:${details.level}] ${details.message}`)
+    })
+  }
   contents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//i.test(url)) void shell.openExternal(url)
     return { action: 'deny' }

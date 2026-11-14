@@ -1,11 +1,11 @@
 {
   "name": "chatxown",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Overlay chat for Twitch and YouTube",
   "main": "./out/main/index.js",
   "author": "Vilminessa",
-  "license": "MIT",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
