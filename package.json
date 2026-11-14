@@ -12,7 +12,8 @@
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "probe": "node scripts/probe-twitch.mjs",
-    "icon": "node scripts/gen-icon.mjs"
+    "icon": "node scripts/gen-icon.mjs",
+    "test": "node scripts/test.mjs"
   },
   "dependencies": {
     "ws": "^8.23.0"
@@ -25,6 +26,7 @@
     "@vitejs/plugin-react": "^6.3.0",
     "electron": "^45.3.2",
     "electron-vite": "^6.0.0",
+    "esbuild": "^0.28.2",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "typescript": "^5.9.3",
