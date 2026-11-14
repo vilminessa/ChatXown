@@ -10,6 +10,7 @@ import type {
   Platform,
   SourceConfig
 } from '../shared/types'
+import { parseSourceInput } from '../shared/sources'
 
 export const ACCENTS = ['#9146ff', '#ff5b5b', '#4ecdc4', '#ffb347', '#7dd3fc', '#f472b6']
 
@@ -47,38 +48,8 @@ export function makeSource(platform: Platform, channel: string, index: number): 
   }
 }
 
-export interface ParsedSource {
-  platform: Platform
-  channel: string
-  error?: string
-}
-
-export function parseSourceInput(input: string, forced?: Platform): ParsedSource {
-  const raw = (input ?? '').trim()
-  if (!raw) return { platform: 'twitch', channel: '', error: 'Пустая ссылка или название канала' }
-
-  const platform: Platform =
-    forced ??
-    (/youtu\.?be/i.test(raw) || /^@/.test(raw) ? 'youtube' : 'twitch')
-
-  if (platform === 'youtube') {
-    return { platform, channel: raw.replace(/\s+/g, '') }
-  }
-
-  let value = raw
-    .replace(/^https?:\/\//i, '')
-    .replace(/^www\./i, '')
-    .replace(/^twitch\.tv\//i, '')
-    .replace(/^m\.twitch\.tv\//i, '')
-    .replace(/[?#].*$/, '')
-    .replace(/^\/+|\/+$/g, '')
-  value = value.split('/')[0].replace(/^#/, '').toLowerCase()
-
-  if (!/^[a-z0-9_]{2,25}$/.test(value)) {
-    return { platform, channel: value, error: 'Некорректное имя канала Twitch' }
-  }
-  return { platform, channel: value }
-}
+export type { ParsedSource } from '../shared/sources'
+export { parseSourceInput }
 
 function clamp(value: number, min: number, max: number, fallback: number): number {
   if (!Number.isFinite(value)) return fallback

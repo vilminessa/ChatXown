@@ -284,6 +284,11 @@ input[type='color'] {
   background: rgba(255, 91, 91, 0.12);
 }
 
+.status-offline {
+  color: var(--muted);
+  background: rgba(160, 160, 176, 0.12);
+}
+
 /* switch */
 
 .switch {

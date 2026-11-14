@@ -62,16 +62,26 @@ export function Message({
       {appearance.showTimestamps && <span className="ts">{formatTime(event.ts)}</span>}
 
       {appearance.showBadges &&
-        event.author.badges.map((badge, index) => (
-          <img
-            key={`${badge.id}-${index}`}
-            className="badge"
-            src={badge.url}
-            alt=""
-            title={badge.title ?? badge.id}
-            draggable={false}
-          />
-        ))}
+        event.author.badges.map((badge, index) =>
+          badge.url ? (
+            <img
+              key={`${badge.id}-${index}`}
+              className="badge"
+              src={badge.url}
+              alt=""
+              title={badge.title ?? badge.id}
+              draggable={false}
+            />
+          ) : (
+            <span
+              key={`${badge.id}-${index}`}
+              className="badge-text"
+              title={badge.title ?? badge.id}
+            >
+              {badge.label ?? badge.title ?? badge.id}
+            </span>
+          )
+        )}
 
       {isSystem ? (
         <span className="sys">

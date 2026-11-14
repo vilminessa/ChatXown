@@ -9,6 +9,7 @@ import { loadEmotes } from './emotes'
 import { TwitchIrc, type IrcState } from './twitch/client'
 import { mapClear, mapPrivmsg, mapUsernotice, type MapContext } from './twitch/map'
 import type { IrcMessage } from './twitch/parser'
+import { YouTubeChat, type YouTubeChatState } from './youtube/client'
 
 export interface ChatManagerHandlers {
   onEvent: (event: ChatEvent) => void
@@ -27,12 +28,14 @@ const EMPTY_EMOTES: Map<string, EmoteDef> = new Map()
 export class ChatManager {
   private irc: TwitchIrc
   private sources = new Map<string, SourceConfig>()
+  private twitchSources = new Map<string, SourceConfig>()
   private byChannel = new Map<string, SourceConfig>()
+  private youtubeClients = new Map<string, YouTubeChat>()
+  private youtubeChannels = new Map<string, string>()
   private statuses = new Map<string, SourceStatus>()
   private emotes = new Map<string, EmoteSlot>()
   private loading = new Set<string>()
   private roomIds = new Map<string, string>()
-  private ircState: IrcState = 'disconnected'
   private lastError: string | undefined
 
   constructor(private handlers: ChatManagerHandlers) {
@@ -46,36 +49,97 @@ export class ChatManager {
   /* ------------------------------ sources ------------------------------ */
 
   setSources(sources: SourceConfig[]): void {
-    const twitch = sources.filter((s) => s.platform === 'twitch')
+    this.sources = new Map(sources.map((source) => [source.id, source]))
 
-    this.sources.clear()
+    this.twitchSources.clear()
     this.byChannel.clear()
-    for (const source of twitch) {
-      this.sources.set(source.id, source)
+    for (const source of sources) {
+      if (source.platform !== 'twitch') continue
+      this.twitchSources.set(source.id, source)
       this.byChannel.set(source.channel, source)
     }
 
     for (const id of [...this.statuses.keys()]) {
       if (!this.sources.has(id)) this.statuses.delete(id)
     }
-    for (const source of twitch) {
-      if (!this.statuses.has(source.id)) {
+    for (const source of sources) {
+      const previous = this.statuses.get(source.id)
+      if (!previous) {
         this.statuses.set(source.id, {
           id: source.id,
           channel: source.channel,
           state: source.enabled ? 'connecting' : 'idle'
         })
+      } else {
+        const state = !source.enabled
+          ? 'idle'
+          : previous.state === 'idle'
+            ? 'connecting'
+            : previous.state
+        this.setStatus(source.id, {
+          channel: source.channel,
+          state,
+          detail: source.enabled ? previous.detail : undefined
+        })
       }
     }
 
-    this.irc.setChannels(twitch.filter((s) => s.enabled).map((s) => s.channel))
+    this.irc.setChannels(
+      [...this.twitchSources.values()].filter((source) => source.enabled).map((source) => source.channel)
+    )
 
-    for (const source of twitch) {
+    for (const source of this.twitchSources.values()) {
       const roomId = this.roomIds.get(source.channel)
       if (roomId) this.ensureEmotes(source, roomId)
     }
 
+    this.syncYouTube(sources)
     this.broadcast()
+  }
+
+  private syncYouTube(sources: SourceConfig[]): void {
+    for (const [id, client] of [...this.youtubeClients]) {
+      const source = this.sources.get(id)
+      const channel = this.youtubeChannels.get(id)
+      if (!source || source.platform !== 'youtube' || !source.enabled || source.channel !== channel) {
+        client.stop()
+        this.youtubeClients.delete(id)
+        this.youtubeChannels.delete(id)
+        if (source && (!source.enabled || source.platform !== 'youtube')) {
+          this.setStatus(id, { state: 'idle', detail: undefined, channel: source.channel })
+        }
+      }
+    }
+
+    for (const source of sources) {
+      if (source.platform !== 'youtube' || !source.enabled) continue
+      if (this.youtubeClients.has(source.id)) continue
+
+      const client = new YouTubeChat(source, {
+        onEvent: (event) => this.handleYouTubeEvent(source.id, event),
+        onClear: (payload) => this.handlers.onClear(payload),
+        onStatus: (state, detail) => this.handleYouTubeStatus(source.id, state, detail)
+      })
+      this.youtubeClients.set(source.id, client)
+      this.youtubeChannels.set(source.id, source.channel)
+      client.start()
+    }
+  }
+
+  private handleYouTubeEvent(sourceId: string, event: ChatEvent): void {
+    const source = this.sources.get(sourceId)
+    if (!source || !source.enabled) return
+    if (!this.passesFilter(source, event)) return
+    this.handlers.onEvent(event)
+  }
+
+  private handleYouTubeStatus(sourceId: string, state: YouTubeChatState, detail?: string): void {
+    const source = this.sources.get(sourceId)
+    if (!source || !source.enabled) {
+      this.setStatus(sourceId, { state: 'idle', detail: undefined })
+      return
+    }
+    this.setStatus(sourceId, { state, detail, channel: source.channel })
   }
 
   private status(sourceId: string): SourceStatus | undefined {
@@ -102,9 +166,8 @@ export class ChatManager {
   }
 
   private handleState(state: IrcState, detail?: string): void {
-    this.ircState = state
     this.lastError = detail
-    for (const source of this.sources.values()) {
+    for (const source of this.twitchSources.values()) {
       if (!source.enabled) {
         this.setStatus(source.id, { state: 'idle' })
         continue
@@ -259,6 +322,9 @@ export class ChatManager {
 
   stop(): void {
     this.irc.close()
+    for (const client of this.youtubeClients.values()) client.stop()
+    this.youtubeClients.clear()
+    this.youtubeChannels.clear()
   }
 
   getStatuses(): SourceStatus[] {

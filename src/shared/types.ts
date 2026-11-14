@@ -62,7 +62,7 @@ export interface AppConfig {
 export interface SourceStatus {
   id: string
   channel: string
-  state: 'idle' | 'connecting' | 'connected' | 'error'
+  state: 'idle' | 'connecting' | 'connected' | 'offline' | 'error'
   detail?: string
 }
 
@@ -70,8 +70,11 @@ export interface SourceStatus {
 
 export interface Badge {
   id: string
+  /** empty for text-only badges (YouTube owner/mod/verified) */
   url: string
   title?: string
+  /** short text rendered when there is no image */
+  label?: string
 }
 
 export interface EmoteDef {
@@ -121,7 +124,7 @@ export interface ClearPayload {
   sourceId: string
   /** exact message ids to drop */
   ids?: string[]
-  /** drop every message of this twitch user id */
+  /** drop every message of this user (source-specific user id) */
   userId?: string
   /** drop everything from this source */
   all?: boolean

@@ -52,9 +52,6 @@ export function registerIpc(deps: IpcDeps): void {
       if (parsed.error || !parsed.channel) {
         return { ok: false, error: parsed.error ?? 'Не удалось распознать канал' }
       }
-      if (parsed.platform === 'youtube') {
-        return { ok: false, error: 'YouTube-чаты появятся в следующей версии' }
-      }
       if (config.sources.some((s) => s.platform === parsed.platform && s.channel === parsed.channel)) {
         return { ok: false, error: `Канал ${parsed.channel} уже добавлен` }
       }

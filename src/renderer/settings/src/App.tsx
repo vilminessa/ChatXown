@@ -14,6 +14,7 @@ const STATE_LABELS: Record<SourceStatus['state'], string> = {
   idle: 'выключен',
   connecting: 'подключается',
   connected: 'в чате',
+  offline: 'не в эфире',
   error: 'ошибка'
 }
 
@@ -156,7 +157,7 @@ export function App(): React.JSX.Element {
       <header className="topbar">
         <div>
           <h1>ChatXown</h1>
-          <p className="sub">Оверлей чата Twitch с модерацией · YouTube будет позже</p>
+          <p className="sub">Оверлей чата Twitch и YouTube · модерация Twitch</p>
         </div>
         <button className="ghost" onClick={() => void api.overlayAction('show')}>
           Показать оверлей
@@ -274,7 +275,7 @@ export function App(): React.JSX.Element {
               onKeyDown={(event) => {
                 if (event.key === 'Enter') void addSource()
               }}
-              placeholder="twitch.tv/channel или название канала"
+              placeholder="twitch.tv/канал, youtube.com/@канал или ссылка на видео"
             />
             <select value={platform} onChange={(event) => setPlatform(event.target.value as 'auto' | Platform)}>
               <option value="auto">Авто</option>
@@ -286,6 +287,10 @@ export function App(): React.JSX.Element {
             </button>
           </div>
           {addError && <p className="error">{addError}</p>}
+          <p className="muted small">
+            YouTube: @handle, ID канала <code>UC…</code>, ссылка на канал или на конкретный эфир. Если
+            канал не в эфире, ChatXown ждёт и подключится автоматически.
+          </p>
 
           <div className="sources">
             {config.sources.length === 0 && (
@@ -350,21 +355,29 @@ export function App(): React.JSX.Element {
                   </div>
 
                   <div className="source-extra">
-                    <span className="muted">Эмоуты:</span>
-                    {(['sevenTv', 'bttv', 'ffz'] as const).map((key) => (
-                      <label key={key} className="check">
-                        <input
-                          type="checkbox"
-                          checked={source.emotes[key]}
-                          onChange={(event) =>
-                            void updateSource(source.id, {
-                              emotes: { ...source.emotes, [key]: event.target.checked }
-                            })
-                          }
-                        />
-                        {key === 'sevenTv' ? '7TV' : key.toUpperCase()}
-                      </label>
-                    ))}
+                    {source.platform === 'twitch' ? (
+                      <>
+                        <span className="muted">Эмоуты:</span>
+                        {(['sevenTv', 'bttv', 'ffz'] as const).map((key) => (
+                          <label key={key} className="check">
+                            <input
+                              type="checkbox"
+                              checked={source.emotes[key]}
+                              onChange={(event) =>
+                                void updateSource(source.id, {
+                                  emotes: { ...source.emotes, [key]: event.target.checked }
+                                })
+                              }
+                            />
+                            {key === 'sevenTv' ? '7TV' : key.toUpperCase()}
+                          </label>
+                        ))}
+                      </>
+                    ) : (
+                      <span className="muted small">
+                        YouTube: нативные эмоуты канала (7TV/BTTV/FFZ не поддерживают YouTube)
+                      </span>
+                    )}
 
                     <span className="muted">Скрыть слова/юзеров:</span>
                     <input
