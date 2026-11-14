@@ -15,8 +15,8 @@
     "probe": "node scripts/probe-twitch.mjs",
     "icon": "node scripts/gen-icon.mjs",
     "test": "node scripts/test.mjs",
-    "dist": "npm run build && npm run bundle:youtube && electron-builder --win",
-    "dist:dir": "npm run build && npm run bundle:youtube && electron-builder --win --dir"
+    "dist": "npm run build && npm run bundle:youtube && electron-builder --win --publish never",
+    "dist:dir": "npm run build && npm run bundle:youtube && electron-builder --win --dir --publish never"
   },
   "dependencies": {
     "ws": "^8.23.0",
