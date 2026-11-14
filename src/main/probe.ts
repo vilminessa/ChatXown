@@ -351,6 +351,15 @@ export function runUiProbe(deps: ProbeDeps): void {
       logInteraction(`watcher tick ${i + 1}`)
     }
 
+    // Guard: with a fullscreen chat area the watcher cannot tell "over the chat" from "anywhere",
+    // so it must not capture the screen even though the real cursor sits inside the window.
+    deps.setChat(null)
+    deps.action('hide')
+    await wait(600)
+    deps.action('show')
+    await wait(1200)
+    logInteraction('polling with fullscreen chat')
+
     restore()
     await wait(400)
     log(`[probe] config restored -> ${JSON.stringify(deps.overlay())}`)
